@@ -469,6 +469,13 @@ class PopupController {
             const macdElement = document.getElementById('macdValue');
             const bbElement = document.getElementById('bbValue');
             const trendElement = document.getElementById('trendValue');
+            const stochElement = document.getElementById("stochValue");
+            const emaCrossElement = document.getElementById("emaCrossValue");
+            const trendShortElement = document.getElementById("trendShortValue");
+            const trendMediumElement = document.getElementById("trendMediumValue");
+            const trendLongElement = document.getElementById("trendLongValue");
+            const adxElement = document.getElementById("adxValue");
+            const stElement = document.getElementById("superTrendValue");
 
             if (rsiElement) rsiElement.textContent =
                 data.indicators.rsi ? data.indicators.rsi.toFixed(2) : '--';
@@ -476,8 +483,14 @@ class PopupController {
                 data.indicators.macd ? data.indicators.macd.toFixed(4) : '--';
             if (bbElement) bbElement.textContent =
                 data.indicators.bb ? data.indicators.bb.position : '--';
-            if (trendElement) trendElement.textContent =
-                data.indicators.trend || '--';
+            if (trendElement) trendElement.textContent = data.indicators.trend || "--";
+            if (stochElement) stochElement.textContent = data.indicators.stoch ? data.indicators.stoch.k.toFixed(1) + "/" + data.indicators.stoch.d.toFixed(1) : "--";
+            if (emaCrossElement) emaCrossElement.textContent = data.indicators.emaCross && data.indicators.emaCross.signal ? data.indicators.emaCross.signal : "--";
+            if (trendShortElement) trendShortElement.textContent = data.indicators.trendShort || "--";
+            if (trendMediumElement) trendMediumElement.textContent = data.indicators.trendMedium || "--";
+            if (trendLongElement) trendLongElement.textContent = data.indicators.trendLong || "--";
+            if (adxElement && data.indicators.adx !== undefined) adxElement.textContent = data.indicators.adx.toFixed(1);
+            if (stElement) stElement.textContent = data.indicators.superTrend || "--";
         }
         
         // تحديث معلومات السعر
