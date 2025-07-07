@@ -173,6 +173,10 @@ class PocketOptionAnalyzer {
                             <span id="po-ema-cross">--</span>
                         </div>
                         <div class="po-indicator">
+                            <span>الاتجاه فائق القصر:</span>
+                            <span id="po-trend-micro">--</span>
+                        </div>
+                        <div class="po-indicator">
                             <span>الاتجاه قصير:</span>
                             <span id="po-trend-short">--</span>
                         </div>
@@ -756,6 +760,7 @@ class PocketOptionAnalyzer {
         console.log(`📊 الاتجاه محسوب: ${trend} (تغيير: ${change.toFixed(3)}% من ${availableData} نقاط)`);
     }
     calculateMultiTimeframeTrends() {
+        this.indicators.trendMicro = this.computeTrendForPeriod(30);
         this.indicators.trendShort = this.computeTrendForPeriod(60);
         this.indicators.trendMedium = this.computeTrendForPeriod(300);
         this.indicators.trendLong = this.computeTrendForPeriod(900);
@@ -927,7 +932,9 @@ class PocketOptionAnalyzer {
                 this.signals.push({type: dir === "صاعد" ? "CALL" : "PUT", strength: "قوي", reason: "اتجاه قوي مؤكد بعدة فريمات", confidence: 80});
             }
         }
-        if (this.indicators.trendShort && this.indicators.trendMedium && this.indicators.trendShort === this.indicators.trendMedium && this.indicators.trendShort !== "جانبي") {
+        if (this.indicators.trendMicro && this.indicators.trendShort && this.indicators.trendMedium && this.indicators.trendMicro === this.indicators.trendShort && this.indicators.trendShort === this.indicators.trendMedium && this.indicators.trendMicro !== "جانبي") {
+            this.signals.push({type: this.indicators.trendMicro === "صاعد" ? "CALL" : "PUT", strength: "قوي", reason: "اتجاه قصير متوافق", confidence: 60});
+        } else if (this.indicators.trendShort && this.indicators.trendMedium && this.indicators.trendShort === this.indicators.trendMedium && this.indicators.trendShort !== "جانبي") {
             this.signals.push({type: this.indicators.trendShort === "صاعد" ? "CALL" : "PUT", strength: "قوي", reason: "اتجاه متوافق على عدة فريمات", confidence: 60});
         }
     }
@@ -1022,6 +1029,10 @@ class PocketOptionAnalyzer {
         const emaCrossElement = document.getElementById("po-ema-cross");
         if (emaCrossElement) {
             emaCrossElement.textContent = this.indicators.emaCross && this.indicators.emaCross.signal ? this.indicators.emaCross.signal : "--";
+        }
+        const trendMicroEl = document.getElementById("po-trend-micro");
+        if (trendMicroEl && this.indicators.trendMicro) {
+            trendMicroEl.textContent = this.indicators.trendMicro;
         }
         const trendShortEl = document.getElementById("po-trend-short");
         if (trendShortEl && this.indicators.trendShort) {

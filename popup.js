@@ -471,6 +471,7 @@ class PopupController {
             const trendElement = document.getElementById('trendValue');
             const stochElement = document.getElementById("stochValue");
             const emaCrossElement = document.getElementById("emaCrossValue");
+            const trendMicroElement = document.getElementById("trendMicroValue");
             const trendShortElement = document.getElementById("trendShortValue");
             const trendMediumElement = document.getElementById("trendMediumValue");
             const trendLongElement = document.getElementById("trendLongValue");
@@ -487,6 +488,7 @@ class PopupController {
             if (trendElement) trendElement.textContent = data.indicators.trend || "--";
             if (stochElement) stochElement.textContent = data.indicators.stoch ? data.indicators.stoch.k.toFixed(1) + "/" + data.indicators.stoch.d.toFixed(1) : "--";
             if (emaCrossElement) emaCrossElement.textContent = data.indicators.emaCross && data.indicators.emaCross.signal ? data.indicators.emaCross.signal : "--";
+            if (trendMicroElement) trendMicroElement.textContent = data.indicators.trendMicro || "--";
             if (trendShortElement) trendShortElement.textContent = data.indicators.trendShort || "--";
             if (trendMediumElement) trendMediumElement.textContent = data.indicators.trendMedium || "--";
             if (trendLongElement) trendLongElement.textContent = data.indicators.trendLong || "--";
