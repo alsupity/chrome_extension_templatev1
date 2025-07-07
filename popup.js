@@ -469,6 +469,17 @@ class PopupController {
             const macdElement = document.getElementById('macdValue');
             const bbElement = document.getElementById('bbValue');
             const trendElement = document.getElementById('trendValue');
+            const stochElement = document.getElementById("stochValue");
+            const emaCrossElement = document.getElementById("emaCrossValue");
+            const trendMicroElement = document.getElementById("trendMicroValue");
+            const trendShortElement = document.getElementById("trendShortValue");
+            const trendMediumElement = document.getElementById("trendMediumValue");
+            const trendLongElement = document.getElementById("trendLongValue");
+            const atrElement = document.getElementById("atrValue");
+            const adxElement = document.getElementById("adxValue");
+            const kcElement = document.getElementById("kcValue");
+            const aroonElement = document.getElementById("aroonValue");
+            const superTrendElement = document.getElementById("superTrendValue");
 
             if (rsiElement) rsiElement.textContent =
                 data.indicators.rsi ? data.indicators.rsi.toFixed(2) : '--';
@@ -476,8 +487,18 @@ class PopupController {
                 data.indicators.macd ? data.indicators.macd.toFixed(4) : '--';
             if (bbElement) bbElement.textContent =
                 data.indicators.bb ? data.indicators.bb.position : '--';
-            if (trendElement) trendElement.textContent =
-                data.indicators.trend || '--';
+            if (trendElement) trendElement.textContent = data.indicators.trend || "--";
+            if (stochElement) stochElement.textContent = data.indicators.stoch ? data.indicators.stoch.k.toFixed(1) + "/" + data.indicators.stoch.d.toFixed(1) : "--";
+            if (emaCrossElement) emaCrossElement.textContent = data.indicators.emaCross && data.indicators.emaCross.signal ? data.indicators.emaCross.signal : "--";
+            if (trendMicroElement) trendMicroElement.textContent = data.indicators.trendMicro || "--";
+            if (trendShortElement) trendShortElement.textContent = data.indicators.trendShort || "--";
+            if (trendMediumElement) trendMediumElement.textContent = data.indicators.trendMedium || "--";
+            if (trendLongElement) trendLongElement.textContent = data.indicators.trendLong || "--";
+            if (atrElement) atrElement.textContent = data.indicators.atr ? data.indicators.atr.toFixed(5) : "--";
+            if (adxElement) adxElement.textContent = data.indicators.adx ? data.indicators.adx.toFixed(1) : "--";
+            if (kcElement) kcElement.textContent = data.indicators.kc ? data.indicators.kc.center.toFixed(5) : "--";
+            if (aroonElement) aroonElement.textContent = data.indicators.aroon ? Math.round(data.indicators.aroon.up) + "/" + Math.round(data.indicators.aroon.down) : "--";
+            if (superTrendElement) superTrendElement.textContent = data.indicators.supertrend ? data.indicators.supertrend.direction : "--";
         }
         
         // تحديث معلومات السعر

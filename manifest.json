@@ -24,7 +24,7 @@
         "https://*.pocketoption.com/*",
         "https://pocketoption.com/*"
       ],
-      "js": ["content.js"],
+      "js": ["scalper_content.js"],
       "css": ["styles.css"],
       "run_at": "document_end"
     }
