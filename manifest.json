@@ -1,0 +1,45 @@
+{
+  "manifest_version": 3,
+  "name": "PocketOption Trading Assistant",
+  "version": "1.0",
+  "description": "محلل تقني متقدم لمنصة PocketOption مع توصيات تداول ذكية",
+  "permissions": [
+    "activeTab",
+    "storage",
+    "alarms",
+    "scripting",
+    "notifications"
+  ],
+  "host_permissions": [
+    "https://*.pocketoption.com/*",
+    "https://pocketoption.com/*"
+  ],
+  "action": {
+    "default_popup": "popup.html",
+    "default_title": "PocketOption Assistant"
+  },
+  "content_scripts": [
+    {
+      "matches": [
+        "https://*.pocketoption.com/*",
+        "https://pocketoption.com/*"
+      ],
+      "js": ["content.js"],
+      "css": ["styles.css"],
+      "run_at": "document_end"
+    }
+  ],
+  "background": {
+    "service_worker": "background.js",
+    "type": "module"
+  },
+  "web_accessible_resources": [
+    {
+      "resources": ["injected.js"],
+      "matches": ["https://*.pocketoption.com/*"]
+    }
+  ],
+  "content_security_policy": {
+    "extension_pages": "script-src 'self'; object-src 'self'"
+  }
+}

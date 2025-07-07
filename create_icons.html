@@ -1,0 +1,192 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>إنشاء أيقونات الإضافة</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            padding: 20px;
+            background: #f0f0f0;
+        }
+        .icon-container {
+            display: inline-block;
+            margin: 20px;
+            text-align: center;
+        }
+        .icon {
+            border: 2px solid #ccc;
+            margin: 10px;
+        }
+        button {
+            background: #4CAF50;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 5px;
+            cursor: pointer;
+            margin: 5px;
+        }
+        button:hover {
+            background: #45a049;
+        }
+        .instructions {
+            background: #e7f3ff;
+            padding: 15px;
+            border-radius: 5px;
+            margin: 20px 0;
+        }
+    </style>
+</head>
+<body>
+    <h1>🎯 إنشاء أيقونات إضافة PocketOption</h1>
+    
+    <div class="instructions">
+        <h3>📋 التعليمات:</h3>
+        <ol>
+            <li>اضغط على "إنشاء الأيقونات" أدناه</li>
+            <li>انقر بزر الماوس الأيمن على كل أيقونة</li>
+            <li>اختر "Save image as..." أو "حفظ الصورة باسم"</li>
+            <li>احفظ الأيقونات في مجلد <code>icons/</code> بالأسماء المحددة</li>
+            <li>أعد تحميل الإضافة في Chrome</li>
+        </ol>
+    </div>
+
+    <button onclick="createIcons()">🎨 إنشاء الأيقونات</button>
+    <button onclick="downloadAll()">📥 تحميل جميع الأيقونات</button>
+
+    <div id="iconsContainer"></div>
+
+    <script>
+        function createIcon(size, text = '📊') {
+            const canvas = document.createElement('canvas');
+            canvas.width = size;
+            canvas.height = size;
+            const ctx = canvas.getContext('2d');
+            
+            // خلفية متدرجة
+            const gradient = ctx.createLinearGradient(0, 0, size, size);
+            gradient.addColorStop(0, '#1e3c72');
+            gradient.addColorStop(1, '#2a5298');
+            ctx.fillStyle = gradient;
+            ctx.fillRect(0, 0, size, size);
+            
+            // حدود مستديرة
+            ctx.beginPath();
+            ctx.roundRect(0, 0, size, size, size * 0.15);
+            ctx.clip();
+            ctx.fillRect(0, 0, size, size);
+            
+            // الرمز
+            ctx.fillStyle = 'white';
+            ctx.font = `${size * 0.5}px Arial`;
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'middle';
+            ctx.fillText(text, size / 2, size / 2);
+            
+            // إضافة نص صغير للأحجام الكبيرة
+            if (size >= 48) {
+                ctx.fillStyle = 'rgba(255, 255, 255, 0.8)';
+                ctx.font = `${size * 0.1}px Arial`;
+                ctx.fillText('PO', size / 2, size * 0.8);
+            }
+            
+            return canvas;
+        }
+
+        function createIcons() {
+            const container = document.getElementById('iconsContainer');
+            container.innerHTML = '';
+            
+            const sizes = [
+                { size: 16, name: 'icon16.png' },
+                { size: 48, name: 'icon48.png' },
+                { size: 128, name: 'icon128.png' }
+            ];
+            
+            sizes.forEach(({ size, name }) => {
+                const iconContainer = document.createElement('div');
+                iconContainer.className = 'icon-container';
+                
+                const canvas = createIcon(size);
+                canvas.className = 'icon';
+                canvas.title = `انقر بزر الماوس الأيمن واحفظ باسم: ${name}`;
+                
+                const label = document.createElement('div');
+                label.textContent = `${name} (${size}x${size})`;
+                
+                const downloadBtn = document.createElement('button');
+                downloadBtn.textContent = 'تحميل';
+                downloadBtn.onclick = () => downloadIcon(canvas, name);
+                
+                iconContainer.appendChild(canvas);
+                iconContainer.appendChild(label);
+                iconContainer.appendChild(downloadBtn);
+                container.appendChild(iconContainer);
+            });
+        }
+
+        function downloadIcon(canvas, filename) {
+            const link = document.createElement('a');
+            link.download = filename;
+            link.href = canvas.toDataURL('image/png');
+            link.click();
+        }
+
+        function downloadAll() {
+            const canvases = document.querySelectorAll('.icon');
+            const names = ['icon16.png', 'icon48.png', 'icon128.png'];
+            
+            canvases.forEach((canvas, index) => {
+                setTimeout(() => {
+                    downloadIcon(canvas, names[index]);
+                }, index * 500);
+            });
+        }
+
+        // إضافة دعم للحدود المستديرة
+        if (!CanvasRenderingContext2D.prototype.roundRect) {
+            CanvasRenderingContext2D.prototype.roundRect = function(x, y, width, height, radius) {
+                this.beginPath();
+                this.moveTo(x + radius, y);
+                this.lineTo(x + width - radius, y);
+                this.quadraticCurveTo(x + width, y, x + width, y + radius);
+                this.lineTo(x + width, y + height - radius);
+                this.quadraticCurveTo(x + width, y + height, x + width - radius, y + height);
+                this.lineTo(x + radius, y + height);
+                this.quadraticCurveTo(x, y + height, x, y + height - radius);
+                this.lineTo(x, y + radius);
+                this.quadraticCurveTo(x, y, x + radius, y);
+                this.closePath();
+            };
+        }
+
+        // إنشاء الأيقونات تلقائياً عند تحميل الصفحة
+        window.onload = createIcons;
+    </script>
+
+    <div class="instructions">
+        <h3>📁 هيكل المجلدات المطلوب:</h3>
+        <pre>
+chrome_extension_template/
+├── icons/
+│   ├── icon16.png
+│   ├── icon48.png
+│   └── icon128.png
+├── manifest.json
+├── content.js
+└── ... (باقي الملفات)
+        </pre>
+        
+        <h3>🔧 إذا لم تعمل الأيقونات:</h3>
+        <p>يمكنك حذف قسم الأيقونات من <code>manifest.json</code> مؤقتاً:</p>
+        <pre>
+// احذف أو علّق على هذا القسم:
+// "icons": {
+//   "16": "icons/icon16.png",
+//   "48": "icons/icon48.png", 
+//   "128": "icons/icon128.png"
+// }
+        </pre>
+    </div>
+</body>
+</html>

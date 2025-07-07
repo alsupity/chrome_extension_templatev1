@@ -1,0 +1,290 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8">
+    <style>
+        body {
+            width: 380px;
+            padding: 20px;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #1e3c72 0%, #2a5298 100%);
+            color: white;
+            margin: 0;
+            direction: rtl;
+        }
+        .header {
+            text-align: center;
+            margin-bottom: 20px;
+            border-bottom: 2px solid rgba(255, 255, 255, 0.1);
+            padding-bottom: 15px;
+        }
+        .header h2 {
+            margin: 0;
+            font-size: 18px;
+            text-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
+        }
+        .signal-box {
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 12px;
+            padding: 15px;
+            margin: 12px 0;
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            backdrop-filter: blur(10px);
+            transition: all 0.3s ease;
+        }
+        .signal-box:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(0, 0, 0, 0.2);
+        }
+        .signal-strong {
+            border-left: 5px solid #4CAF50;
+            background: rgba(76, 175, 80, 0.1);
+        }
+        .signal-weak {
+            border-left: 5px solid #FFC107;
+            background: rgba(255, 193, 7, 0.1);
+        }
+        .signal-none {
+            border-left: 5px solid #F44336;
+            background: rgba(244, 67, 54, 0.1);
+        }
+        .button {
+            background: linear-gradient(45deg, #4CAF50, #45a049);
+            color: white;
+            border: none;
+            padding: 12px 20px;
+            border-radius: 8px;
+            cursor: pointer;
+            width: 100%;
+            margin: 8px 0;
+            font-weight: bold;
+            transition: all 0.3s ease;
+            box-shadow: 0 4px 15px rgba(76, 175, 80, 0.3);
+        }
+        .button:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 20px rgba(76, 175, 80, 0.4);
+        }
+        .button.secondary {
+            background: linear-gradient(45deg, #2196F3, #1976D2);
+            box-shadow: 0 4px 15px rgba(33, 150, 243, 0.3);
+        }
+        .button.secondary:hover {
+            box-shadow: 0 6px 20px rgba(33, 150, 243, 0.4);
+        }
+        .status {
+            text-align: center;
+            font-size: 12px;
+            margin-top: 15px;
+            opacity: 0.8;
+            padding: 8px;
+            background: rgba(0, 0, 0, 0.2);
+            border-radius: 6px;
+        }
+        .risk-warning {
+            background: rgba(244, 67, 54, 0.2);
+            border: 1px solid #F44336;
+            border-radius: 8px;
+            padding: 12px;
+            margin: 15px 0;
+            font-size: 12px;
+            text-align: center;
+        }
+        .signal-box h3 {
+            margin: 0 0 10px 0;
+            font-size: 14px;
+            color: #FFD700;
+            text-shadow: 0 1px 2px rgba(0, 0, 0, 0.3);
+        }
+        .signal-data {
+            display: flex;
+            justify-content: space-between;
+            margin: 8px 0;
+            font-size: 13px;
+        }
+        .signal-value {
+            font-weight: bold;
+            color: #FFD700;
+        }
+        .indicator-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 8px;
+            margin-top: 10px;
+        }
+        .indicator-item {
+            background: rgba(0, 0, 0, 0.2);
+            padding: 8px;
+            border-radius: 6px;
+            text-align: center;
+            font-size: 11px;
+        }
+        .indicator-label {
+            display: block;
+            color: #FFD700;
+            font-weight: bold;
+            margin-bottom: 3px;
+        }
+        .connection-status {
+            display: inline-block;
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            margin-left: 8px;
+        }
+        .connected {
+            background: #4CAF50;
+            box-shadow: 0 0 5px #4CAF50;
+        }
+        .disconnected {
+            background: #F44336;
+            box-shadow: 0 0 5px #F44336;
+        }
+        .recommendation-box {
+            background: rgba(0, 0, 0, 0.3);
+            border-radius: 8px;
+            padding: 12px;
+            margin-top: 10px;
+            border-left: 4px solid #FFC107;
+        }
+        .recommendation-call {
+            border-left-color: #4CAF50;
+            background: rgba(76, 175, 80, 0.1);
+        }
+        .recommendation-put {
+            border-left-color: #F44336;
+            background: rgba(244, 67, 54, 0.1);
+        }
+        .recommendation-text {
+            font-size: 14px;
+            font-weight: bold;
+            margin-bottom: 5px;
+        }
+        .confidence-bar {
+            width: 100%;
+            height: 6px;
+            background: rgba(255, 255, 255, 0.2);
+            border-radius: 3px;
+            overflow: hidden;
+            margin-top: 8px;
+        }
+        .confidence-fill {
+            height: 100%;
+            background: linear-gradient(90deg, #4CAF50, #FFD700, #F44336);
+            transition: width 0.3s ease;
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h2>🎯 محلل PocketOption</h2>
+        <div class="status" id="status">
+            جاري تحليل السوق...
+            <span class="connection-status disconnected" id="connectionStatus"></span>
+        </div>
+    </div>
+
+    <div class="risk-warning">
+        ⚠️ <strong>تحذير عالي المخاطر:</strong> تداول فقط بالأموال التي يمكنك تحمل خسارتها بالكامل.
+    </div>
+
+    <div class="signal-box" id="mainSignal">
+        <h3>📊 الإشارة الحالية</h3>
+        <div class="recommendation-box" id="recommendationBox">
+            <div class="recommendation-text" id="signalDirection">جاري التحليل...</div>
+            <div class="signal-data">
+                <span>القوة:</span>
+                <span class="signal-value" id="signalStrength">--</span>
+            </div>
+            <div class="signal-data">
+                <span>مدة الصفقة:</span>
+                <span class="signal-value" id="signalExpiry">--</span>
+            </div>
+            <div class="confidence-bar">
+                <div class="confidence-fill" id="confidenceFill" style="width: 0%"></div>
+            </div>
+        </div>
+    </div>
+
+    <div class="signal-box">
+        <h3>📈 المؤشرات الفنية</h3>
+        <div class="indicator-grid">
+            <div class="indicator-item">
+                <span class="indicator-label">RSI</span>
+                <span id="rsiValue">--</span>
+            </div>
+            <div class="indicator-item">
+                <span class="indicator-label">MACD</span>
+                <span id="macdValue">--</span>
+            </div>
+            <div class="indicator-item">
+                <span class="indicator-label">BB</span>
+                <span id="bbValue">--</span>
+            </div>
+            <div class="indicator-item">
+                <span class="indicator-label">الاتجاه</span>
+                <span id="trendValue">--</span>
+            </div>
+        </div>
+    </div>
+
+    <div class="signal-box">
+        <h3>💰 معلومات السعر</h3>
+        <div class="signal-data">
+            <span>السعر الحالي:</span>
+            <span class="signal-value" id="currentPrice">--</span>
+        </div>
+        <div class="signal-data">
+            <span>التغيير:</span>
+            <span class="signal-value" id="priceChange">--</span>
+        </div>
+        <div class="signal-data">
+            <span>التقلبات:</span>
+            <span class="signal-value" id="volatility">--</span>
+        </div>
+    </div>
+
+    <div class="signal-box">
+        <h3>⚡ إجراءات سريعة</h3>
+        <button class="button" id="analyzeBtn">تحليل فوري</button>
+        <button class="button secondary" id="testBtn">🧪 اختبار سريع</button>
+        <button class="button secondary" id="toggleAnalyzer">تفعيل/إيقاف المحلل</button>
+        <button class="button secondary" id="settingsBtn">الإعدادات</button>
+    </div>
+
+    <div class="signal-box">
+        <h3>🎛️ التحكم في لوحة التحليل</h3>
+        <button class="button" id="showPanelBtn">📊 إظهار لوحة التحليل</button>
+        <button class="button secondary" id="hidePanelBtn">🙈 إخفاء لوحة التحليل</button>
+        <div style="font-size: 11px; margin-top: 8px; opacity: 0.8; text-align: center;">
+            💡 لوحة التحليل تظهر على صفحة PocketOption مباشرة
+        </div>
+    </div>
+
+    <div class="signal-box">
+        <h3>🔧 أدوات التشخيص</h3>
+        <button class="button secondary" id="diagnosticBtn">🔍 تشخيص مشاكل البيانات</button>
+        <div style="font-size: 11px; margin-top: 8px; opacity: 0.8; text-align: center;">
+            💡 استخدم هذا إذا لم تظهر أي قيم أو بيانات
+        </div>
+    </div>
+
+    <div class="signal-box">
+        <h3>📊 إحصائيات اليوم</h3>
+        <div class="signal-data">
+            <span>عدد الإشارات:</span>
+            <span class="signal-value" id="signalCount">0</span>
+        </div>
+        <div class="signal-data">
+            <span>دقة التوقعات:</span>
+            <span class="signal-value" id="accuracy">--%</span>
+        </div>
+        <div class="signal-data">
+            <span>آخر تحديث:</span>
+            <span class="signal-value" id="lastUpdate">--</span>
+        </div>
+    </div>
+
+    <script src="popup.js"></script>
+</body>
+</html>
