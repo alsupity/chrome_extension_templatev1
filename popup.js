@@ -471,6 +471,9 @@ class PopupController {
             const trendElement = document.getElementById('trendValue');
             const stochElement = document.getElementById("stochValue");
             const emaCrossElement = document.getElementById("emaCrossValue");
+            const adxElement = document.getElementById("adxValue");
+            const superTrendElement = document.getElementById("superTrendValue");
+            const atrElement = document.getElementById("atrValue");
             const trendShortElement = document.getElementById("trendShortValue");
             const trendMediumElement = document.getElementById("trendMediumValue");
 
@@ -483,6 +486,9 @@ class PopupController {
             if (trendElement) trendElement.textContent = data.indicators.trend || "--";
             if (stochElement) stochElement.textContent = data.indicators.stoch ? data.indicators.stoch.k.toFixed(1) + "/" + data.indicators.stoch.d.toFixed(1) : "--";
             if (emaCrossElement) emaCrossElement.textContent = data.indicators.emaCross && data.indicators.emaCross.signal ? data.indicators.emaCross.signal : "--";
+            if (adxElement) adxElement.textContent = data.indicators.adx !== undefined && data.indicators.adx !== null ? data.indicators.adx.toFixed(2) : "--";
+            if (superTrendElement) superTrendElement.textContent = data.indicators.superTrend ? data.indicators.superTrend.trend : "--";
+            if (atrElement) atrElement.textContent = data.indicators.atr ? data.indicators.atr.toFixed(5) : "--";
             if (trendShortElement) trendShortElement.textContent = data.indicators.trendShort || "--";
             if (trendMediumElement) trendMediumElement.textContent = data.indicators.trendMedium || "--";
         }

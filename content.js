@@ -173,6 +173,18 @@ class PocketOptionAnalyzer {
                             <span id="po-ema-cross">--</span>
                         </div>
                         <div class="po-indicator">
+                            <span>ADX:</span>
+                            <span id="po-adx">--</span>
+                        </div>
+                        <div class="po-indicator">
+                            <span>SuperTrend:</span>
+                            <span id="po-supertrend">--</span>
+                        </div>
+                        <div class="po-indicator">
+                            <span>ATR:</span>
+                            <span id="po-atr">--</span>
+                        </div>
+                        <div class="po-indicator">
                             <span>الاتجاه قصير:</span>
                             <span id="po-trend-short">--</span>
                         </div>
@@ -594,6 +606,10 @@ class PocketOptionAnalyzer {
         this.calculateMultiTimeframeTrends();
         this.calculateStochastic();
         this.calculateEMACross();
+        this.calculateATR();
+        this.calculateADX();
+        this.calculateSuperTrend();
+        this.calculateMomentum();
 
         // تحليل الإشارات
         this.analyzeSignals();
@@ -780,6 +796,59 @@ class PocketOptionAnalyzer {
         console.log(`📊 Stochastic محسوب: %K=${k.toFixed(2)}, %D=${d.toFixed(2)}`);
     }
 
+    calculateATR(period = 14) {
+        if (this.priceHistory.length < period + 1) { this.indicators.atr = null; return; }
+        const data = this.priceHistory.slice(-period-1).map(p=>p.price);
+        let sum = 0;
+        for (let i=1;i<data.length;i++) {
+            sum += Math.abs(data[i]-data[i-1]);
+        }
+        this.indicators.atr = sum / period;
+        console.log(`📊 ATR محسوب: ${this.indicators.atr.toFixed(5)}`);
+    }
+
+    calculateADX(period = 14) {
+        if (this.priceHistory.length < period + 1) { this.indicators.adx = null; return; }
+        const data = this.priceHistory.slice(-period-1).map(p=>p.price);
+        let upMove = 0, downMove = 0, tr = 0;
+        for (let i=1;i<data.length;i++) {
+            const diff = data[i] - data[i-1];
+            if (diff > 0) upMove += diff; else if (diff < 0) downMove += Math.abs(diff);
+            tr += Math.abs(diff);
+        }
+        if (tr === 0) { this.indicators.adx = 0; return; }
+        const plusDI = 100 * (upMove / tr);
+        const minusDI = 100 * (downMove / tr);
+        const adx = Math.abs(plusDI - minusDI) / (plusDI + minusDI) * 100;
+        this.indicators.adx = adx;
+        console.log(`📊 ADX محسوب: ${adx.toFixed(2)}`);
+    }
+
+    calculateSuperTrend(period = 10, multiplier = 3) {
+        this.calculateATR(period);
+        if (!this.indicators.atr) { this.indicators.superTrend = null; return; }
+        const prices = this.priceHistory.map(p=>p.price);
+        const usePeriod = Math.min(period, prices.length);
+        const ma = prices.slice(-usePeriod).reduce((a,b)=>a+b,0) / usePeriod;
+        const upper = ma + multiplier * this.indicators.atr;
+        const lower = ma - multiplier * this.indicators.atr;
+        let trend = this.indicators.superTrend ? this.indicators.superTrend.trend : 'UP';
+        let value = this.indicators.superTrend ? this.indicators.superTrend.value : ma;
+        const close = this.currentPrice;
+        if (close > upper) { trend = 'UP'; value = lower; }
+        else if (close < lower) { trend = 'DOWN'; value = upper; }
+        this.indicators.superTrend = { trend, value };
+        console.log(`📊 SuperTrend: ${trend} عند ${value.toFixed(5)}`);
+    }
+
+    calculateMomentum(period = 5) {
+        if (this.priceHistory.length < period + 1) { this.indicators.momentum = null; return; }
+        const prices = this.priceHistory.map(p=>p.price);
+        const momentum = prices[prices.length-1] - prices[prices.length-1-period];
+        this.indicators.momentum = momentum;
+        console.log(`📊 Momentum محسوب: ${momentum.toFixed(5)}`);
+    }
+
     calculateEMACross(fast=5, slow=20) {
         if (this.priceHistory.length < slow + 1) { this.indicators.emaCross = null; return; }
         const prices = this.priceHistory.map(p=>p.price);
@@ -866,6 +935,20 @@ class PocketOptionAnalyzer {
         if (this.indicators.trendShort && this.indicators.trendMedium && this.indicators.trendShort === this.indicators.trendMedium && this.indicators.trendShort !== "جانبي") {
             this.signals.push({type: this.indicators.trendShort === "صاعد" ? "CALL" : "PUT", strength: "قوي", reason: "اتجاه متوافق على عدة فريمات", confidence: 60});
         }
+        if (this.indicators.superTrend && this.indicators.adx) {
+            if (this.indicators.superTrend.trend === 'UP' && this.indicators.adx > 20) {
+                this.signals.push({type:'CALL', strength:'قوي', reason:'اتجاه قوي مع SuperTrend صاعد', confidence:80});
+            } else if (this.indicators.superTrend.trend === 'DOWN' && this.indicators.adx > 20) {
+                this.signals.push({type:'PUT', strength:'قوي', reason:'اتجاه قوي مع SuperTrend هابط', confidence:80});
+            }
+        }
+        if (this.indicators.momentum) {
+            if (this.indicators.momentum > 0) {
+                this.signals.push({type:'CALL', strength:'ضعيف', reason:'Momentum إيجابي', confidence:40});
+            } else if (this.indicators.momentum < 0) {
+                this.signals.push({type:'PUT', strength:'ضعيف', reason:'Momentum سلبي', confidence:40});
+            }
+        }
     }
 
     generateRecommendation() {
@@ -912,9 +995,8 @@ class PocketOptionAnalyzer {
 
     suggestExpiry() {
         // اقتراح مدة الصفقة بناءً على التقلبات
-        const volatility = this.calculateVolatility();
-        
-        if (volatility > 0.3) return "1 دقيقة";
+        const atr = this.indicators.atr || this.calculateVolatility();
+        if (atr > 0.0003) return "1 دقيقة";
         else return "2 دقائق";
 
     }
@@ -959,6 +1041,18 @@ class PocketOptionAnalyzer {
         const emaCrossElement = document.getElementById("po-ema-cross");
         if (emaCrossElement) {
             emaCrossElement.textContent = this.indicators.emaCross && this.indicators.emaCross.signal ? this.indicators.emaCross.signal : "--";
+        }
+        const adxElement = document.getElementById("po-adx");
+        if (adxElement && this.indicators.adx !== undefined) {
+            adxElement.textContent = this.indicators.adx !== null ? this.indicators.adx.toFixed(2) : "--";
+        }
+        const superTrendEl = document.getElementById("po-supertrend");
+        if (superTrendEl && this.indicators.superTrend) {
+            superTrendEl.textContent = this.indicators.superTrend.trend;
+        }
+        const atrElement = document.getElementById("po-atr");
+        if (atrElement && this.indicators.atr) {
+            atrElement.textContent = this.indicators.atr.toFixed(5);
         }
         const trendShortEl = document.getElementById("po-trend-short");
         if (trendShortEl && this.indicators.trendShort) {
