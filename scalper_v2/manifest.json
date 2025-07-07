@@ -1,0 +1,19 @@
+{
+  "manifest_version": 3,
+  "name": "PocketOption Scalper V2",
+  "version": "2.0",
+  "description": "سكالبينج احترافي مع تحليل متعدد الفريمات",
+  "permissions": ["activeTab", "storage"],
+  "host_permissions": ["https://*.pocketoption.com/*", "https://pocketoption.com/*"],
+  "action": {
+    "default_popup": "popup_v2.html",
+    "default_title": "Scalper V2"
+  },
+  "content_scripts": [
+    {
+      "matches": ["https://*.pocketoption.com/*", "https://pocketoption.com/*"],
+      "js": ["content_v2.js"],
+      "run_at": "document_idle"
+    }
+  ]
+}
