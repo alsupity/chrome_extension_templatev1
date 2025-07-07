@@ -1,1201 +1,257 @@
-// PocketOption Trading Assistant - Content Script
-// محلل تقني متقدم لمنصة PocketOption
-
-class PocketOptionAnalyzer {
+// New PocketOption Scalping Assistant - completely rewritten
+class ScalpingAssistant {
     constructor() {
-        this.isActive = false;
-        this.currentPrice = 0;
         this.priceHistory = [];
         this.indicators = {};
-        this.signals = [];
-        this.analysisPanel = null;
-        this.updateInterval = null;
-        
-        this.init();
-    }
-
-    init() {
-        console.log('🚀 PocketOption Trading Assistant تم تحميله');
-
-        // حقن السكريبت المساعد
-        this.injectDataExtractor();
-
-        // انتظار تحميل الصفحة بالكامل
-        if (document.readyState === 'loading') {
-            document.addEventListener('DOMContentLoaded', () => this.start());
-        } else {
-            this.start();
-        }
-    }
-
-    injectDataExtractor() {
-        try {
-            // حقن السكريبت للوصول المباشر لبيانات الصفحة
-            const script = document.createElement('script');
-            script.src = chrome.runtime.getURL('injected.js');
-            script.onload = function() {
-                this.remove();
-            };
-            (document.head || document.documentElement).appendChild(script);
-
-            // استقبال البيانات من السكريبت المحقون
-            window.addEventListener('message', (event) => {
-                if (event.data && event.data.type === 'PO_PRICE_UPDATE') {
-                    this.handleInjectedData(event.data.data);
-                } else if (event.data && event.data.type === 'PO_DATA_RESPONSE') {
-                    this.handleInjectedData(event.data.data);
-                }
-            });
-        } catch (error) {
-            console.log('خطأ في حقن السكريبت:', error);
-        }
-    }
-
-    handleInjectedData(data) {
-        console.log('📨 تم استلام بيانات من injected script:', data);
-
-        if (data.currentPrice && data.currentPrice !== this.currentPrice) {
-            console.log(`💰 سعر جديد من injected script: ${data.currentPrice}`);
-            this.currentPrice = data.currentPrice;
-
-            // دمج البيانات من المصدر المحقون
-            if (data.priceHistory && data.priceHistory.length > 0) {
-                this.priceHistory = data.priceHistory;
-                console.log(`📊 تم تحديث تاريخ الأسعار: ${data.priceHistory.length} نقطة`);
-            } else if (data.priceData && data.priceData.length > 0) {
-                this.priceHistory = data.priceData;
-                console.log(`📊 تم تحديث بيانات الأسعار: ${data.priceData.length} نقطة`);
-            }
-
-            // تحديث التحليل
-            this.performAnalysis();
-            this.updateUI();
-        } else if (data.priceData && data.priceData.length > 0) {
-            // حتى لو لم يتغير السعر الحالي، نحدث التاريخ
-            this.priceHistory = data.priceData;
-            if (data.priceData.length > 0) {
-                this.currentPrice = data.priceData[data.priceData.length - 1].price;
-                console.log(`📊 تم تحديث البيانات من injected script: ${this.currentPrice}`);
-                this.performAnalysis();
-                this.updateUI();
-            }
-        }
+        this.recommendation = {action: 'انتظار', confidence: 0, expiry: '1 دقيقة'};
+        this.start();
     }
 
     start() {
-        // بدء مراقبة البيانات فقط (بدون إنشاء لوحة تلقائية)
-        this.startDataMonitoring();
-
-        // إضافة مستمعي الأحداث
-        this.addEventListeners();
-
-        this.isActive = true;
-        console.log('✅ محلل PocketOption جاهز للعمل (في الخلفية)');
-
-        // إشعار المستخدم أن المحلل جاهز
-        this.showNotification('محلل PocketOption جاهز! اضغط على أيقونة الإضافة للوصول للتحليل');
-    }
-
-    showNotification(message) {
-        // إنشاء إشعار بسيط في الزاوية
-        const notification = document.createElement('div');
-        notification.style.cssText = `
-            position: fixed;
-            top: 20px;
-            right: 20px;
-            background: linear-gradient(135deg, #1e3c72 0%, #2a5298 100%);
-            color: white;
-            padding: 15px 20px;
-            border-radius: 8px;
-            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.3);
-            z-index: 10000;
-            font-family: Arial, sans-serif;
-            font-size: 14px;
-            max-width: 300px;
-            direction: rtl;
-            border: 2px solid #FFD700;
-        `;
-        notification.textContent = message;
-        document.body.appendChild(notification);
-
-        // إزالة الإشعار بعد 5 ثوان
-        setTimeout(() => {
-            if (notification.parentNode) {
-                notification.remove();
-            }
-        }, 5000);
-    }
-
-    createAnalysisPanel() {
-        // إنشاء لوحة التحليل الجانبية
-        this.analysisPanel = document.createElement('div');
-        this.analysisPanel.id = 'po-analysis-panel';
-        this.analysisPanel.innerHTML = `
-            <div class="po-panel-header">
-                <h3>🎯 محلل التداول</h3>
-                <button id="po-toggle-btn">تصغير</button>
-            </div>
-            <div class="po-panel-content">
-                <div class="po-signal-section">
-                    <h4>📊 الإشارة الحالية</h4>
-                    <div id="po-current-signal" class="po-signal-box">
-                        <div class="po-signal-direction">تحليل...</div>
-                        <div class="po-signal-strength">القوة: --</div>
-                        <div class="po-signal-expiry">المدة المقترحة: --</div>
-                    </div>
-                </div>
-                
-                <div class="po-indicators-section">
-                    <h4>📈 المؤشرات الفنية</h4>
-                    <div id="po-indicators">
-                        <div class="po-indicator">
-                            <span>RSI:</span>
-                            <span id="po-rsi">--</span>
-                        </div>
-                        <div class="po-indicator">
-                            <span>MACD:</span>
-                            <span id="po-macd">--</span>
-                        </div>
-                        <div class="po-indicator">
-                            <span>BB:</span>
-                            <span id="po-bb">--</span>
-                        </div>
-                        <div class="po-indicator">
-                            <span>الاتجاه:</span>
-                            <span id="po-trend">--</span>
-                        </div>
-                    </div>
-                </div>
-                
-                <div class="po-price-section">
-                    <h4>💰 معلومات السعر</h4>
-                    <div id="po-price-info">
-                        <div>السعر الحالي: <span id="po-current-price">--</span></div>
-                        <div>التغيير: <span id="po-price-change">--</span></div>
-                        <div>التقلبات: <span id="po-volatility">--</span></div>
-                    </div>
-                </div>
-                
-                <div class="po-recommendation-section">
-                    <h4>🎯 التوصية</h4>
-                    <div id="po-recommendation" class="po-recommendation-box">
-                        <div class="po-action">الإجراء: <span id="po-action">انتظار</span></div>
-                        <div class="po-confidence">الثقة: <span id="po-confidence">--</span></div>
-                        <div class="po-entry-price">سعر الدخول: <span id="po-entry-price">--</span></div>
-                        <div class="po-expiry-time">مدة الصفقة: <span id="po-expiry-time">--</span></div>
-                    </div>
-                </div>
-                
-                <div class="po-controls-section">
-                    <button id="po-analyze-btn" class="po-btn po-btn-primary">تحليل فوري</button>
-                    <button id="po-auto-trade-btn" class="po-btn po-btn-secondary">تفعيل التحليل التلقائي</button>
-                </div>
-            </div>
-        `;
-        
-        document.body.appendChild(this.analysisPanel);
-    }
-
-    startDataMonitoring() {
-        // مراقبة تغييرات السعر كل ثانية
-        this.updateInterval = setInterval(() => {
-            this.collectMarketData();
-            this.performAnalysis();
-            this.updateUI();
+        this.collectPrice();
+        this.timer = setInterval(() => {
+            this.collectPrice();
+            this.calculateIndicators();
+            this.makeDecision();
         }, 1000);
-
-        // مراقبة تغييرات DOM للأسعار الديناميكية
-        this.setupDOMObserver();
     }
 
-    collectMarketData() {
-        try {
-            console.log('🔍 البحث المحسن عن بيانات السعر...');
-
-            // 1. محاولة الحصول على البيانات من injected script أولاً
-            window.postMessage({ type: 'PO_GET_DATA' }, '*');
-
-            // 2. البحث المباشر في الصفحة - نسخة محسنة
-            let price = this.findPriceInPage();
-
-            // 3. البحث في عناصر الرسم البياني
-            if (!price) {
-                price = this.findPriceInChart();
-            }
-
-            // 4. البحث في WebSocket أو Network requests
-            if (!price) {
-                price = this.findPriceInNetwork();
-            }
-
-            // 5. البحث العام في جميع النصوص
-            if (!price) {
-                price = this.findPriceInAllText();
-            }
-
-            // تحديث البيانات إذا وُجد سعر جديد
-            if (price && this.isValidPrice(price)) {
-                this.updatePriceData(price);
-            } else {
-                console.warn('⚠️ لم يتم العثور على سعر صالح');
-                this.runAdvancedDiagnostics();
-            }
-
-        } catch (error) {
-            console.error('خطأ في جمع بيانات السوق:', error);
-        }
-    }
-
-    findPriceInPage() {
-        console.log('🔍 البحث المباشر في الصفحة...');
-
-        // محددات محسنة خاصة بـ PocketOption
-        const priceSelectors = [
-            // محددات عامة للأسعار
-            '[class*="price"]', '[class*="rate"]', '[class*="quote"]', '[class*="value"]',
-            '[class*="current"]', '[class*="last"]', '[class*="bid"]', '[class*="ask"]',
-            '[id*="price"]', '[id*="rate"]', '[id*="quote"]', '[id*="current"]',
-
-            // محددات خاصة بـ PocketOption
-            '[class*="asset"]', '[class*="symbol"]', '[class*="ticker"]',
-            '[class*="chart"]', '[class*="trading"]', '[class*="market"]',
-            '[class*="instrument"]', '[class*="currency"]',
-
-            // محددات CSS شائعة
-            '.price', '.rate', '.quote', '.current-price', '.market-price',
-            '.asset-price', '.trading-price', '.chart-price', '.live-price',
-
-            // محددات بناءً على البنية والتصميم
-            'span[style*="font-weight"]', 'div[style*="font-size"]',
-            'span[style*="color"]', 'div[style*="color"]',
-            'span[style*="font-family"]', 'div[style*="font-family"]',
-
-            // محددات إضافية للبحث الشامل
-            'span', 'div', 'td', 'th', 'p', 'label'
-        ];
-
-        // البحث في المحددات المحددة أولاً
-        for (const selector of priceSelectors.slice(0, -1)) { // كل المحددات عدا الأخير
-            try {
-                const elements = document.querySelectorAll(selector);
-                for (const element of elements) {
-                    const price = this.extractPriceFromElement(element);
-                    if (price) {
-                        console.log(`💰 سعر من محدد ${selector}: ${price}`);
-                        return price;
-                    }
-                }
-            } catch (e) {
-                // تجاهل أخطاء المحددات غير الصالحة
+    collectPrice() {
+        const el = document.querySelector('[class*="price"], [id*="price"]');
+        if (el) {
+            const price = parseFloat(el.textContent);
+            if (!isNaN(price)) {
+                this.priceHistory.push({price, time: Date.now()});
+                if (this.priceHistory.length > 600) this.priceHistory.shift();
             }
         }
-
-        // البحث الشامل في جميع العناصر النصية (كحل أخير)
-        console.log('🔍 البحث الشامل في جميع العناصر النصية...');
-        const allTextElements = document.querySelectorAll('span, div, td, th, p, label');
-        for (const element of allTextElements) {
-            const text = element.textContent?.trim();
-            if (text && /^\d+\.\d{4,6}$/.test(text)) { // أرقام بـ 4-6 خانات عشرية
-                const price = parseFloat(text);
-                if (this.isValidPrice(price)) {
-                    console.log(`💰 سعر من البحث الشامل: ${price}`);
-                    return price;
-                }
-            }
-        }
-
-        return null;
     }
 
-    findPriceInChart() {
-        console.log('📊 البحث في عناصر الرسم البياني...');
-
-        // البحث في عناصر Canvas
-        const canvases = document.querySelectorAll('canvas');
-        canvases.forEach((canvas, index) => {
-            console.log(`🎨 Canvas ${index}: ${canvas.width}x${canvas.height}`);
-        });
-
-        // البحث في عناصر SVG
-        const svgs = document.querySelectorAll('svg');
-        for (let i = 0; i < svgs.length; i++) {
-            const svg = svgs[i];
-            const texts = svg.querySelectorAll('text');
-            for (let j = 0; j < texts.length; j++) {
-                const text = texts[j];
-                const price = this.extractPriceFromElement(text);
-                if (price) {
-                    console.log(`💰 سعر من SVG: ${price}`);
-                    return price;
-                }
-            }
+    ema(period, data) {
+        if (data.length < period) return null;
+        const k = 2 / (period + 1);
+        let ema = data[0];
+        for (let i = 1; i < data.length; i++) {
+            ema = data[i] * k + ema * (1 - k);
         }
-
-        return null;
-    }
-
-    findPriceInNetwork() {
-        console.log('🌐 البحث في طلبات الشبكة...');
-        // هذا سيتم التعامل معه في injected script
-        return null;
-    }
-
-    findPriceInAllText() {
-        console.log('📝 البحث العام في جميع النصوص...');
-
-        // الحصول على جميع النصوص المرئية
-        const allText = document.body.innerText || document.body.textContent || '';
-
-        // أنماط أسعار محسنة
-        const pricePatterns = [
-            /\b1\.\d{5}\b/g,           // EUR/USD (1.12345)
-            /\b1\.\d{4}\b/g,           // EUR/USD (1.1234)
-            /\b0\.\d{5}\b/g,           // GBP/USD (0.12345)
-            /\b0\.\d{4}\b/g,           // GBP/USD (0.1234)
-            /\b\d{1,3}\.\d{3,5}\b/g,   // عام (123.12345)
-            /\b\d+\.\d{2,6}\b/g,       // أي رقم عشري
-        ];
-
-        for (const pattern of pricePatterns) {
-            const matches = allText.match(pattern);
-            if (matches) {
-                // أخذ أحدث الأرقام
-                const prices = matches
-                    .map(m => parseFloat(m))
-                    .filter(p => this.isValidPrice(p))
-                    .slice(-5); // آخر 5 أرقام
-
-                if (prices.length > 0) {
-                    const price = prices[prices.length - 1];
-                    console.log(`💰 سعر من النص العام: ${price}`);
-                    return price;
-                }
-            }
-        }
-
-        return null;
-    }
-
-    extractPriceFromElement(element) {
-        if (!element) return null;
-
-        const text = element.textContent || element.innerText || '';
-        if (!text.trim()) return null;
-
-        // البحث عن أرقام في النص
-        const priceRegex = /\d+\.\d{2,6}/g;
-        const matches = text.match(priceRegex);
-
-        if (matches) {
-            for (const match of matches) {
-                const price = parseFloat(match);
-                if (this.isValidPrice(price)) {
-                    return price;
-                }
-            }
-        }
-
-        return null;
-    }
-
-    isValidPrice(price) {
-        if (!price || isNaN(price)) return false;
-
-        // نطاق واسع للأسعار المحتملة
-        return price > 0.0001 && price < 1000000;
-    }
-
-    updatePriceData(price) {
-        // تحقق من أن السعر مختلف بما فيه الكفاية
-        if (Math.abs(price - this.currentPrice) > 0.00001) {
-            this.priceHistory.push({
-                price: price,
-                timestamp: Date.now()
-            });
-
-            // الاحتفاظ بآخر 100 نقطة
-            if (this.priceHistory.length > 100) {
-                this.priceHistory.shift();
-            }
-
-            this.currentPrice = price;
-            console.log(`📊 تم تحديث السعر: ${price}, عدد النقاط: ${this.priceHistory.length}`);
-        }
-    }
-
-    runAdvancedDiagnostics() {
-        console.log('🔧 تشخيص متقدم للبحث عن الأسعار...');
-
-        // طباعة معلومات الصفحة
-        console.log('🌐 URL:', window.location.href);
-        console.log('📄 Title:', document.title);
-
-        // البحث عن جميع الأرقام في الصفحة
-        const allNumbers = (document.body.innerText || '').match(/\d+\.\d+/g);
-        if (allNumbers) {
-            console.log('🔢 جميع الأرقام العشرية:', allNumbers.slice(0, 30));
-
-            // تصنيف الأرقام حسب عدد الخانات العشرية
-            const priceNumbers = allNumbers.filter(num => {
-                const decimal = num.split('.')[1];
-                return decimal && decimal.length >= 4; // أسعار عادة لها 4+ خانات عشرية
-            });
-            console.log('💰 أرقام محتملة للأسعار (4+ خانات):', priceNumbers.slice(0, 15));
-        }
-
-        // البحث عن عناصر تحتوي على أرقام مع تفاصيل أكثر
-        const suspiciousElements = document.querySelectorAll('span, div, td, th, p, label');
-        const numbersFound = [];
-        const priceElements = [];
-
-        suspiciousElements.forEach(el => {
-            const text = el.textContent?.trim();
-            if (text && /^\d+\.\d+$/.test(text)) {
-                const info = {
-                    text: text,
-                    element: el.tagName,
-                    class: el.className || 'بدون class',
-                    id: el.id || 'بدون id',
-                    parent: el.parentElement?.tagName || 'بدون parent',
-                    parentClass: el.parentElement?.className || 'بدون parent class'
-                };
-
-                numbersFound.push(info);
-
-                // إذا كان الرقم يبدو كسعر (4+ خانات عشرية)
-                const decimal = text.split('.')[1];
-                if (decimal && decimal.length >= 4) {
-                    priceElements.push(info);
-                }
-            }
-        });
-
-        console.log('🎯 عناصر تحتوي على أرقام:', numbersFound.slice(0, 15));
-        console.log('💰 عناصر محتملة للأسعار:', priceElements.slice(0, 10));
-
-        // البحث في عناصر Canvas و SVG
-        const canvases = document.querySelectorAll('canvas');
-        const svgs = document.querySelectorAll('svg');
-        console.log(`🎨 عدد عناصر Canvas: ${canvases.length}`);
-        console.log(`📊 عدد عناصر SVG: ${svgs.length}`);
-
-        // البحث في عناصر مخفية أو ديناميكية
-        const hiddenElements = document.querySelectorAll('[style*="display: none"], [hidden]');
-        console.log(`👻 عدد العناصر المخفية: ${hiddenElements.length}`);
-    }
-
-    setupDOMObserver() {
-        console.log('👁️ إعداد مراقب DOM للأسعار الديناميكية...');
-
-        // إنشاء مراقب للتغييرات في DOM
-        this.domObserver = new MutationObserver((mutations) => {
-            let foundPrice = false;
-
-            mutations.forEach((mutation) => {
-                // مراقبة التغييرات في النصوص
-                if (mutation.type === 'childList') {
-                    mutation.addedNodes.forEach((node) => {
-                        if (node.nodeType === Node.TEXT_NODE || node.nodeType === Node.ELEMENT_NODE) {
-                            const price = this.extractPriceFromNode(node);
-                            if (price) {
-                                console.log(`💰 سعر جديد من DOM Observer: ${price}`);
-                                this.updatePriceData(price);
-                                foundPrice = true;
-                            }
-                        }
-                    });
-                }
-
-                // مراقبة تغييرات الخصائص (مثل textContent)
-                if (mutation.type === 'characterData') {
-                    const price = this.extractPriceFromNode(mutation.target);
-                    if (price) {
-                        console.log(`💰 سعر محدث من DOM Observer: ${price}`);
-                        this.updatePriceData(price);
-                        foundPrice = true;
-                    }
-                }
-            });
-
-            // إذا وُجد سعر جديد، قم بالتحليل
-            if (foundPrice) {
-                this.performAnalysis();
-                this.updateUI();
-            }
-        });
-
-        // بدء مراقبة التغييرات
-        this.domObserver.observe(document.body, {
-            childList: true,
-            subtree: true,
-            characterData: true,
-            characterDataOldValue: true
-        });
-    }
-
-    extractPriceFromNode(node) {
-        if (!node) return null;
-
-        let text = '';
-        if (node.nodeType === Node.TEXT_NODE) {
-            text = node.textContent || '';
-        } else if (node.nodeType === Node.ELEMENT_NODE) {
-            text = node.textContent || node.innerText || '';
-        }
-
-        text = text.trim();
-
-        // البحث عن أرقام تبدو كأسعار
-        const priceRegex = /\b\d+\.\d{4,6}\b/g;
-        const matches = text.match(priceRegex);
-
-        if (matches) {
-            for (const match of matches) {
-                const price = parseFloat(match);
-                if (this.isValidPrice(price)) {
-                    return price;
-                }
-            }
-        }
-
-        return null;
-    }
-
-    performAnalysis() {
-        // التحليل فقط إذا كان لدينا بيانات حقيقية
-        if (this.priceHistory.length < 2) {
-            console.log('⏳ انتظار المزيد من البيانات الحقيقية للتحليل...');
-            return;
-        }
-
-        console.log(`🔍 بدء التحليل الحقيقي مع ${this.priceHistory.length} نقطة بيانات`);
-
-        // حساب المؤشرات الفنية
-        this.calculateRSI();
-        this.calculateMACD();
-        this.calculateBollingerBands();
-        this.calculateTrend();
-
-        // تحليل الإشارات
-        this.analyzeSignals();
-
-        // إنتاج التوصية
-        this.generateRecommendation();
-
-        console.log('✅ تم إكمال التحليل الحقيقي:', {
-            dataPoints: this.priceHistory.length,
-            currentPrice: this.currentPrice,
-            rsi: this.indicators.rsi?.toFixed(2),
-            macd: this.indicators.macd?.toFixed(4),
-            bb: this.indicators.bb?.position,
-            trend: this.indicators.trend,
-            recommendation: this.recommendation?.action,
-            confidence: this.recommendation?.confidence?.toFixed(0) + '%'
-        });
-    }
-
-    calculateRSI(period = 14) {
-        // نحتاج على الأقل نقطتين لحساب RSI
-        if (this.priceHistory.length < 2) {
-            this.indicators.rsi = null;
-            return;
-        }
-
-        // استخدام البيانات المتاحة (حد أدنى 2 نقاط)
-        const availableData = Math.min(this.priceHistory.length - 1, period);
-        const prices = this.priceHistory.slice(-availableData - 1);
-        let gains = 0, losses = 0, count = 0;
-
-        for (let i = 1; i < prices.length; i++) {
-            const change = prices[i].price - prices[i-1].price;
-            if (change > 0) gains += change;
-            else if (change < 0) losses += Math.abs(change);
-            count++;
-        }
-
-        if (count === 0) {
-            this.indicators.rsi = 50; // محايد
-            return;
-        }
-
-        const avgGain = gains / count;
-        const avgLoss = losses / count;
-
-        let rsi;
-        if (avgLoss === 0) {
-            rsi = 100; // كل التغييرات إيجابية
-        } else if (avgGain === 0) {
-            rsi = 0; // كل التغييرات سلبية
-        } else {
-            const rs = avgGain / avgLoss;
-            rsi = 100 - (100 / (1 + rs));
-        }
-
-        this.indicators.rsi = rsi;
-        console.log(`📊 RSI محسوب: ${rsi.toFixed(2)} (من ${count} تغيير)`);
-    }
-
-    // تم حذف دالة generateDummyData - نستخدم فقط البيانات الحقيقية
-
-    calculateMACD() {
-        // نحتاج على الأقل 3 نقاط لحساب MACD
-        if (this.priceHistory.length < 3) {
-            this.indicators.macd = null;
-            return;
-        }
-
-        const prices = this.priceHistory.map(p => p.price);
-
-        // حساب EMA مبسط للبيانات المتاحة
-        const period1 = Math.min(12, Math.max(2, Math.floor(this.priceHistory.length / 2)));
-        const period2 = Math.min(26, this.priceHistory.length);
-
-        const ema12 = this.calculateEMA(prices, period1);
-        const ema26 = this.calculateEMA(prices, period2);
-
-        if (ema12 && ema26) {
-            this.indicators.macd = ema12 - ema26;
-            console.log(`📊 MACD محسوب: ${this.indicators.macd.toFixed(4)} (EMA${period1}: ${ema12.toFixed(5)}, EMA${period2}: ${ema26.toFixed(5)})`);
-        } else {
-            this.indicators.macd = null;
-        }
-    }
-
-    calculateEMA(prices, period) {
-        if (prices.length < period) return null;
-        
-        const multiplier = 2 / (period + 1);
-        let ema = prices[0];
-        
-        for (let i = 1; i < prices.length; i++) {
-            ema = (prices[i] * multiplier) + (ema * (1 - multiplier));
-        }
-        
         return ema;
     }
 
-    calculateBollingerBands(period = 20) {
-        // نحتاج على الأقل 3 نقاط لحساب Bollinger Bands
-        if (this.priceHistory.length < 3) {
-            this.indicators.bb = null;
-            return;
+    rsi(period, closes) {
+        if (closes.length < period + 1) return null;
+        let gains = 0, losses = 0;
+        for (let i = 1; i <= period; i++) {
+            const diff = closes[i] - closes[i - 1];
+            if (diff >= 0) gains += diff; else losses -= diff;
         }
-
-        const availableData = Math.min(this.priceHistory.length, period);
-        const prices = this.priceHistory.slice(-availableData).map(p => p.price);
-        const sma = prices.reduce((sum, price) => sum + price, 0) / availableData;
-
-        const variance = prices.reduce((sum, price) => sum + Math.pow(price - sma, 2), 0) / availableData;
-        const stdDev = Math.sqrt(variance);
-
-        const upper = sma + (2 * stdDev);
-        const lower = sma - (2 * stdDev);
-
-        let position;
-        if (this.currentPrice > upper) position = 'upper';
-        else if (this.currentPrice < lower) position = 'lower';
-        else position = 'middle';
-
-        this.indicators.bb = {
-            upper: upper,
-            middle: sma,
-            lower: lower,
-            position: position
-        };
-
-        console.log(`📊 Bollinger Bands محسوب: ${position} (Upper: ${upper.toFixed(5)}, Middle: ${sma.toFixed(5)}, Lower: ${lower.toFixed(5)})`);
+        let avgGain = gains / period;
+        let avgLoss = losses / period;
+        for (let i = period + 1; i < closes.length; i++) {
+            const diff = closes[i] - closes[i - 1];
+            avgGain = (avgGain * (period - 1) + (diff > 0 ? diff : 0)) / period;
+            avgLoss = (avgLoss * (period - 1) + (diff < 0 ? -diff : 0)) / period;
+        }
+        if (avgLoss === 0) return 100;
+        const rs = avgGain / avgLoss;
+        return 100 - (100 / (1 + rs));
     }
 
-    calculateTrend() {
-        // نحتاج على الأقل نقطتين لحساب الاتجاه
-        if (this.priceHistory.length < 2) {
-            this.indicators.trend = 'غير محدد';
-            return;
-        }
-
-        const availableData = Math.min(this.priceHistory.length, 10);
-        const recentPrices = this.priceHistory.slice(-availableData).map(p => p.price);
-        const firstPrice = recentPrices[0];
-        const lastPrice = recentPrices[recentPrices.length - 1];
-
-        const change = ((lastPrice - firstPrice) / firstPrice) * 100;
-
-        let trend;
-        if (change > 0.01) trend = 'صاعد';      // 0.01% صعود
-        else if (change < -0.01) trend = 'هابط'; // 0.01% هبوط
-        else trend = 'جانبي';
-
-        this.indicators.trend = trend;
-        console.log(`📊 الاتجاه محسوب: ${trend} (تغيير: ${change.toFixed(3)}% من ${availableData} نقاط)`);
+    macd(closes) {
+        const ema12 = this.ema(12, closes);
+        const ema26 = this.ema(26, closes);
+        if (ema12 === null || ema26 === null) return null;
+        const macdLine = ema12 - ema26;
+        const signal = this.ema(9, closes.slice(closes.length - 35));
+        if (signal === null) return null;
+        return macdLine - signal;
     }
 
-    analyzeSignals() {
-        this.signals = [];
-        
-        // إشارات RSI
-        if (this.indicators.rsi) {
-            if (this.indicators.rsi > 70) {
-                this.signals.push({
-                    type: 'PUT',
-                    strength: 'قوي',
-                    reason: 'RSI في منطقة التشبع الشرائي',
-                    confidence: 75
-                });
-            } else if (this.indicators.rsi < 30) {
-                this.signals.push({
-                    type: 'CALL',
-                    strength: 'قوي',
-                    reason: 'RSI في منطقة التشبع البيعي',
-                    confidence: 75
-                });
-            }
+    stoch(kPeriod, dPeriod, closes) {
+        if (closes.length < kPeriod + dPeriod) return null;
+        const recent = closes.slice(-kPeriod);
+        const low = Math.min(...recent);
+        const high = Math.max(...recent);
+        const k = ((closes[closes.length - 1] - low) / (high - low)) * 100;
+        const dVals = [];
+        for (let i = dPeriod; i > 0; i--) {
+            const slice = closes.slice(-(kPeriod + i - 1), -i + 1);
+            const lo = Math.min(...slice);
+            const hi = Math.max(...slice);
+            dVals.push(((slice[slice.length - 1] - lo) / (hi - lo)) * 100);
         }
-        
-        // إشارات Bollinger Bands
-        if (this.indicators.bb) {
-            if (this.indicators.bb.position === 'upper') {
-                this.signals.push({
-                    type: 'PUT',
-                    strength: 'متوسط',
-                    reason: 'السعر عند الحد العلوي لبولينجر',
-                    confidence: 60
-                });
-            } else if (this.indicators.bb.position === 'lower') {
-                this.signals.push({
-                    type: 'CALL',
-                    strength: 'متوسط',
-                    reason: 'السعر عند الحد السفلي لبولينجر',
-                    confidence: 60
-                });
-            }
+        const d = dVals.reduce((a, b) => a + b, 0) / dVals.length;
+        return {k, d};
+    }
+
+    atr(period, highs, lows, closes) {
+        if (highs.length < period + 1) return null;
+        const trs = [];
+        for (let i = 1; i < highs.length; i++) {
+            const high = highs[i];
+            const low = lows[i];
+            const prevClose = closes[i - 1];
+            trs.push(Math.max(high - low, Math.abs(high - prevClose), Math.abs(low - prevClose)));
         }
-        
-        // إشارات MACD
-        if (this.indicators.macd) {
-            if (this.indicators.macd > 0) {
-                this.signals.push({
-                    type: 'CALL',
-                    strength: 'متوسط',
-                    reason: 'MACD إيجابي',
-                    confidence: 55
-                });
+        let atr = trs.slice(0, period).reduce((a, b) => a + b, 0) / period;
+        for (let i = period; i < trs.length; i++) {
+            atr = (atr * (period - 1) + trs[i]) / period;
+        }
+        return atr;
+    }
+
+    adx(period, highs, lows, closes) {
+        if (highs.length < period + 2) return null;
+        const plusDM = [], minusDM = [], trs = [];
+        for (let i = 1; i < highs.length; i++) {
+            const upMove = highs[i] - highs[i-1];
+            const downMove = lows[i-1] - lows[i];
+            plusDM.push(upMove > downMove && upMove > 0 ? upMove : 0);
+            minusDM.push(downMove > upMove && downMove > 0 ? downMove : 0);
+            const high = highs[i];
+            const low = lows[i];
+            const prevClose = closes[i-1];
+            trs.push(Math.max(high - low, Math.abs(high - prevClose), Math.abs(low - prevClose)));
+        }
+        let atr = trs.slice(0, period).reduce((a,b)=>a+b,0)/period;
+        let pDM = plusDM.slice(0, period).reduce((a,b)=>a+b,0)/period;
+        let mDM = minusDM.slice(0, period).reduce((a,b)=>a+b,0)/period;
+        for (let i = period; i < trs.length; i++) {
+            atr = (atr*(period-1)+trs[i])/period;
+            pDM = (pDM*(period-1)+plusDM[i])/period;
+            mDM = (mDM*(period-1)+minusDM[i])/period;
+        }
+        const pDI = 100 * (pDM/atr);
+        const mDI = 100 * (mDM/atr);
+        const dx = Math.abs(pDI - mDI) / (pDI + mDI) * 100;
+        return dx;
+    }
+
+    superTrend(period, multiplier, highs, lows, closes) {
+        if (highs.length < period + 1) return null;
+        const atr = this.atr(period, highs, lows, closes);
+        if (!atr) return null;
+        const hl2 = (highs[highs.length-1] + lows[lows.length-1]) / 2;
+        const finalUpper = hl2 + multiplier * atr;
+        const finalLower = hl2 - multiplier * atr;
+        const prevClose = closes[closes.length - 2];
+        const direction = prevClose > finalUpper ? 'هبوط' : prevClose < finalLower ? 'صعود' : 'جانبي';
+        return {value: direction === 'صعود' ? finalLower : finalUpper, direction};
+    }
+
+    bollinger(period, mult, closes) {
+        if (closes.length < period) return null;
+        const slice = closes.slice(-period);
+        const mean = slice.reduce((a,b)=>a+b,0)/slice.length;
+        const variance = slice.reduce((a,b)=>a+(b-mean)**2,0)/slice.length;
+        const stdev = Math.sqrt(variance);
+        const upper = mean + mult*stdev;
+        const lower = mean - mult*stdev;
+        return {upper, middle: mean, lower, width: (upper-lower)/mean};
+    }
+
+    aroon(period, highs, lows) {
+        if (highs.length < period) return null;
+        const hSlice = highs.slice(-period);
+        const lSlice = lows.slice(-period);
+        const highest = Math.max(...hSlice);
+        const lowest = Math.min(...lSlice);
+        const upIndex = hSlice.lastIndexOf(highest);
+        const downIndex = lSlice.lastIndexOf(lowest);
+        const up = ((period-1 - upIndex)/(period-1))*100;
+        const down = ((period-1 - downIndex)/(period-1))*100;
+        return {up, down};
+    }
+
+    vortex(period, highs, lows, closes) {
+        if (highs.length < period + 1) return null;
+        let plus=0, minus=0, tr=0;
+        for (let i=1; i<=period; i++) {
+            const hi = highs[highs.length-i];
+            const lo = lows[lows.length-i];
+            const prevHi = highs[highs.length-i-1];
+            const prevLo = lows[lows.length-i-1];
+            const prevClose = closes[closes.length-i-1];
+            plus += Math.abs(hi - prevLo);
+            minus += Math.abs(lo - prevHi);
+            tr += Math.max(hi - lo, Math.abs(hi - prevClose), Math.abs(lo - prevClose));
+        }
+        return {plus: plus/tr, minus: minus/tr};
+    }
+
+    calculateIndicators() {
+        const closes = this.priceHistory.map(p => p.price);
+        if (closes.length < 30) return;
+        this.indicators.rsi = this.rsi(14, closes.slice(-30));
+        this.indicators.macd = this.macd(closes.slice(-60));
+        this.indicators.stoch = this.stoch(14, 3, closes);
+        // placeholder highs/lows equal closes for simplicity
+        const highs = closes;
+        const lows = closes;
+        this.indicators.atr = this.atr(14, highs, lows, closes);
+        this.indicators.adx = this.adx(14, highs, lows, closes);
+        this.indicators.super = this.superTrend(10, 3, highs, lows, closes);
+
+        // extra indicators
+        this.indicators.bb = this.bollinger(20, 2, closes);
+        this.indicators.aroon = this.aroon(14, highs, lows);
+        this.indicators.vortex = this.vortex(14, highs, lows, closes);
+
+        // trends by EMA cross
+        this.indicators.trend20 = this.trendByEMA(9, 21, 20);
+        this.indicators.trend60 = this.trendByEMA(9, 21, 60);
+        this.indicators.trend120 = this.trendByEMA(9, 21, 120);
+    }
+
+    trendByEMA(fast, slow, seconds) {
+        const now = Date.now();
+        const subset = this.priceHistory.filter(p => now - p.time <= seconds*1000).map(p=>p.price);
+        if (subset.length < slow) return null;
+        const fastEma = this.ema(fast, subset);
+        const slowEma = this.ema(slow, subset);
+        if (fastEma > slowEma) return 'صاعد';
+        if (fastEma < slowEma) return 'هابط';
+        return 'جانبي';
+    }
+
+    makeDecision() {
+        const ind = this.indicators;
+        if (!ind.rsi || !ind.macd || !ind.stoch || !ind.super) return;
+        const sameDir = ind.trend20 === ind.trend60 && ind.trend60 === ind.trend120 && ind.trend20 !== null;
+        const price = this.priceHistory.length ? this.priceHistory[this.priceHistory.length-1].price : null;
+        if (sameDir && ind.super.direction !== 'جانبي' && ind.adx > 20 && ind.bb) {
+            const strong = Math.abs(ind.vortex.plus - ind.vortex.minus) > 0.1 && ind.aroon.up > 50 && ind.aroon.down < 50;
+            if (ind.super.direction === 'صعود' && ind.stoch.k > ind.stoch.d && price > ind.bb.upper) {
+                this.recommendation = {action: 'CALL', confidence: strong?90:80, expiry: '1 دقيقة'};
+            } else if (ind.super.direction === 'هبوط' && ind.stoch.k < ind.stoch.d && price < ind.bb.lower) {
+                this.recommendation = {action: 'PUT', confidence: strong?90:80, expiry: '1 دقيقة'};
             } else {
-                this.signals.push({
-                    type: 'PUT',
-                    strength: 'متوسط',
-                    reason: 'MACD سلبي',
-                    confidence: 55
-                });
+                this.recommendation = {action: 'انتظار', confidence: 40, expiry: '2 دقائق'};
             }
-        }
-    }
-
-    generateRecommendation() {
-        if (this.signals.length === 0) {
-            this.recommendation = {
-                action: 'انتظار',
-                confidence: 0,
-                expiry: 'غير محدد',
-                reason: 'لا توجد إشارات واضحة'
-            };
-            return;
-        }
-        
-        // تجميع الإشارات حسب النوع
-        const callSignals = this.signals.filter(s => s.type === 'CALL');
-        const putSignals = this.signals.filter(s => s.type === 'PUT');
-        
-        const callConfidence = callSignals.reduce((sum, s) => sum + s.confidence, 0);
-        const putConfidence = putSignals.reduce((sum, s) => sum + s.confidence, 0);
-        
-        if (callConfidence > putConfidence && callConfidence > 100) {
-            this.recommendation = {
-                action: 'CALL',
-                confidence: Math.min(callConfidence / callSignals.length, 95),
-                expiry: this.suggestExpiry(),
-                reason: callSignals.map(s => s.reason).join(', ')
-            };
-        } else if (putConfidence > callConfidence && putConfidence > 100) {
-            this.recommendation = {
-                action: 'PUT',
-                confidence: Math.min(putConfidence / putSignals.length, 95),
-                expiry: this.suggestExpiry(),
-                reason: putSignals.map(s => s.reason).join(', ')
-            };
         } else {
-            this.recommendation = {
-                action: 'انتظار',
-                confidence: 0,
-                expiry: 'غير محدد',
-                reason: 'إشارات متضاربة'
-            };
+            this.recommendation = {action: 'انتظار', confidence: 20, expiry: '2 دقائق'};
         }
+        this.sendToPopup();
     }
 
-    suggestExpiry() {
-        // اقتراح مدة الصفقة بناءً على التقلبات
-        const volatility = this.calculateVolatility();
-        
-        if (volatility > 0.5) return '1 دقيقة';
-        else if (volatility > 0.3) return '3 دقائق';
-        else if (volatility > 0.1) return '5 دقائق';
-        else return '10 دقائق';
-    }
-
-    calculateVolatility() {
-        if (this.priceHistory.length < 10) return 0;
-        
-        const prices = this.priceHistory.slice(-10).map(p => p.price);
-        const mean = prices.reduce((sum, price) => sum + price, 0) / prices.length;
-        const variance = prices.reduce((sum, price) => sum + Math.pow(price - mean, 2), 0) / prices.length;
-        
-        return Math.sqrt(variance) / mean;
-    }
-
-    updateUI() {
-        // تحديث المؤشرات
-        const rsiElement = document.getElementById('po-rsi');
-        if (rsiElement && this.indicators.rsi) {
-            rsiElement.textContent = this.indicators.rsi.toFixed(2);
-            rsiElement.className = this.indicators.rsi > 70 ? 'po-overbought' : 
-                                  this.indicators.rsi < 30 ? 'po-oversold' : 'po-neutral';
-        }
-        
-        const macdElement = document.getElementById('po-macd');
-        if (macdElement && this.indicators.macd) {
-            macdElement.textContent = this.indicators.macd.toFixed(4);
-            macdElement.className = this.indicators.macd > 0 ? 'po-positive' : 'po-negative';
-        }
-        
-        const bbElement = document.getElementById('po-bb');
-        if (bbElement && this.indicators.bb) {
-            bbElement.textContent = this.indicators.bb.position;
-        }
-        
-        const trendElement = document.getElementById('po-trend');
-        if (trendElement && this.indicators.trend) {
-            trendElement.textContent = this.indicators.trend;
-        }
-        
-        // تحديث السعر
-        const priceElement = document.getElementById('po-current-price');
-        if (priceElement) {
-            priceElement.textContent = this.currentPrice.toFixed(5);
-        }
-        
-        // تحديث التوصية
-        if (this.recommendation) {
-            const actionElement = document.getElementById('po-action');
-            const confidenceElement = document.getElementById('po-confidence');
-            const expiryElement = document.getElementById('po-expiry-time');
-            
-            if (actionElement) actionElement.textContent = this.recommendation.action;
-            if (confidenceElement) confidenceElement.textContent = this.recommendation.confidence.toFixed(0) + '%';
-            if (expiryElement) expiryElement.textContent = this.recommendation.expiry;
-            
-            // تلوين التوصية
-            const recommendationBox = document.getElementById('po-recommendation');
-            if (recommendationBox) {
-                recommendationBox.className = 'po-recommendation-box';
-                if (this.recommendation.action === 'CALL') {
-                    recommendationBox.classList.add('po-call-signal');
-                } else if (this.recommendation.action === 'PUT') {
-                    recommendationBox.classList.add('po-put-signal');
-                }
-            }
-        }
-    }
-
-    addEventListeners() {
-        // زر التحليل الفوري
-        const analyzeBtn = document.getElementById('po-analyze-btn');
-        if (analyzeBtn) {
-            analyzeBtn.addEventListener('click', () => {
-                console.log('🔍 بدء التحليل اليدوي...');
-                this.collectMarketData(); // جمع البيانات أولاً
-                this.performAnalysis();
-                this.updateUI();
-            });
-        }
-
-        // إضافة زر تشخيص
-        const diagnosticBtn = document.createElement('button');
-        diagnosticBtn.textContent = '🔧 تشخيص';
-        diagnosticBtn.className = 'po-btn po-btn-secondary';
-        diagnosticBtn.style.marginTop = '5px';
-        diagnosticBtn.addEventListener('click', () => {
-            this.runDiagnostics();
-        });
-
-        const controlsSection = document.querySelector('.po-controls-section');
-        if (controlsSection) {
-            controlsSection.appendChild(diagnosticBtn);
-        }
-
-        // زر تصغير/تكبير اللوحة
-        const toggleBtn = document.getElementById('po-toggle-btn');
-        if (toggleBtn) {
-            toggleBtn.addEventListener('click', () => {
-                const content = document.querySelector('.po-panel-content');
-                if (content.style.display === 'none') {
-                    content.style.display = 'block';
-                    toggleBtn.textContent = 'تصغير';
-                } else {
-                    content.style.display = 'none';
-                    toggleBtn.textContent = 'تكبير';
-                }
-            });
-        }
-
-        // استقبال الرسائل من popup
-        chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
-            switch (request.action) {
-                case 'getData':
-                    sendResponse(this.getCurrentData());
-                    break;
-                case 'analyze':
-                    this.performAnalysis();
-                    this.updateUI();
-                    sendResponse(this.getCurrentData());
-                    break;
-                case 'toggleAnalyzer':
-                    this.isActive = request.enabled;
-                    if (this.isActive) {
-                        this.startDataMonitoring();
-                    } else {
-                        clearInterval(this.updateInterval);
-                    }
-                    sendResponse({ success: true });
-                    break;
-                case 'showPanel':
-                    // إنشاء أو إظهار لوحة التحليل عند الطلب
-                    if (!this.analysisPanel || !document.body.contains(this.analysisPanel)) {
-                        this.createAnalysisPanel();
-                        this.updateUI();
-                    } else {
-                        // إذا كانت موجودة، تبديل الرؤية
-                        this.analysisPanel.style.display =
-                            this.analysisPanel.style.display === 'none' ? 'block' : 'none';
-                    }
-                    sendResponse({ success: true });
-                    break;
-                case 'hidePanel':
-                    // إخفاء لوحة التحليل
-                    if (this.analysisPanel) {
-                        this.analysisPanel.style.display = 'none';
-                    }
-                    sendResponse({ success: true });
-                    break;
-                case 'runDiagnostics':
-                    // تشغيل التشخيص وإرجاع النتائج
-                    const diagnosticResults = this.runComprehensiveDiagnostics();
-                    sendResponse(diagnosticResults);
-                    break;
-                default:
-                    sendResponse({ error: 'Unknown action' });
-            }
-        });
-    }
-
-    runDiagnostics() {
-        console.log('🔧 بدء التشخيص...');
-        console.log('📊 حالة البيانات الحالية:');
-        console.log('- السعر الحالي:', this.currentPrice);
-        console.log('- عدد نقاط التاريخ:', this.priceHistory.length);
-        console.log('- آخر 5 أسعار:', this.priceHistory.slice(-5).map(p => p.price));
-
-        console.log('🔍 البحث عن النصوص في الصفحة...');
-
-        // البحث عن جميع النصوص التي تحتوي على أرقام
-        const allTexts = Array.from(document.querySelectorAll('*'))
-            .filter(el => el.children.length === 0) // عناصر نصية فقط
-            .map(el => el.textContent.trim())
-            .filter(text => /\d/.test(text) && text.length < 20) // تحتوي على أرقام وقصيرة
-            .filter(text => text.length > 0)
-            .slice(0, 50); // أول 50 نص
-
-        console.log('📝 النصوص التي تحتوي على أرقام:', allTexts);
-
-        // البحث عن أنماط الأسعار المختلفة
-        const pricePatterns = [
-            /\b1\.\d{5}\b/,        // EUR/USD pattern (1.15000)
-            /\b1\.\d{4}\b/,        // EUR/USD pattern (1.1500)
-            /\b0\.\d{5}\b/,        // GBP/USD pattern (0.xxxxx)
-            /\b0\.\d{4}\b/,        // GBP/USD pattern (0.xxxx)
-            /\b\d{2,3}\.\d{3,5}\b/, // Other currencies
-            /\b\d+\.\d{5}\b/,      // Any price with 5 decimals
-            /\b\d+\.\d{4}\b/,      // Any price with 4 decimals
-        ];
-
-        const priceTexts = allTexts.filter(text =>
-            pricePatterns.some(pattern => pattern.test(text))
-        );
-        console.log('💰 النصوص التي تشبه الأسعار:', priceTexts);
-
-        // البحث المباشر في العناصر المرئية
-        console.log('🔍 البحث المباشر في العناصر المرئية...');
-        const visibleElements = Array.from(document.querySelectorAll('*')).filter(el => {
-            return el.offsetParent !== null &&
-                   el.offsetWidth > 0 &&
-                   el.offsetHeight > 0 &&
-                   el.children.length === 0; // نص فقط
-        });
-
-        const foundPrices = [];
-        for (const element of visibleElements) {
-            const text = element.textContent.trim();
-            for (const pattern of pricePatterns) {
-                const matches = text.match(pattern);
-                if (matches) {
-                    foundPrices.push({
-                        text: text,
-                        price: matches[0],
-                        element: element.tagName,
-                        className: element.className
-                    });
-                }
-            }
-        }
-
-        console.log('🎯 الأسعار المكتشفة مباشرة:', foundPrices);
-
-        // بحث خاص لـ PocketOption
-        console.log('🔍 بحث خاص لـ PocketOption...');
-
-        // البحث في الرسم البياني
-        const chartElements = document.querySelectorAll('[class*="chart"], [class*="price"], [class*="rate"], [id*="chart"], [id*="price"]');
-        console.log('📊 عناصر الرسم البياني:', chartElements.length);
-
-        // البحث في النصوص الكبيرة (الأسعار عادة تكون بخط كبير)
-        const largeTexts = Array.from(document.querySelectorAll('*')).filter(el => {
-            const style = window.getComputedStyle(el);
-            const fontSize = parseFloat(style.fontSize);
-            return fontSize > 16 && el.children.length === 0 && el.textContent.trim().length > 0;
-        }).map(el => ({
-            text: el.textContent.trim(),
-            fontSize: window.getComputedStyle(el).fontSize,
-            element: el.tagName,
-            className: el.className
-        }));
-
-        console.log('🔤 النصوص الكبيرة (قد تحتوي على أسعار):', largeTexts);
-
-        // البحث عن أي رقم يحتوي على نقطة عشرية
-        const decimalNumbers = allTexts.filter(text => /\d+\.\d+/.test(text));
-        console.log('🔢 جميع الأرقام العشرية:', decimalNumbers);
-
-        // معلومات الصفحة
-        console.log('🌐 معلومات الصفحة:');
-        console.log('- URL:', window.location.href);
-        console.log('- العنوان:', document.title);
-        console.log('- هل هذه صفحة PocketOption؟', window.location.href.includes('pocketoption'));
-
-        alert('تم إكمال التشخيص - تحقق من Console (F12) للتفاصيل');
-    }
-
-    runComprehensiveDiagnostics() {
-        console.log('🔧 بدء التشخيص الشامل...');
-
-        const results = {
-            currentPrice: this.currentPrice,
-            priceHistoryLength: this.priceHistory.length,
-            lastUpdate: this.priceHistory.length > 0 ?
-                new Date(this.priceHistory[this.priceHistory.length - 1].timestamp).toLocaleString() : null,
-            url: window.location.href,
-            title: document.title,
-            canvasCount: document.querySelectorAll('canvas').length,
-            svgCount: document.querySelectorAll('svg').length,
-            numbersFound: 0,
-            elementsWithNumbers: [],
-            recommendations: []
-        };
-
-        // البحث عن جميع الأرقام العشرية
-        const allText = document.body.innerText || '';
-        const numbers = allText.match(/\d+\.\d+/g);
-        results.numbersFound = numbers ? numbers.length : 0;
-
-        // البحث عن عناصر تحتوي على أرقام
-        const elements = document.querySelectorAll('span, div, td, th, p');
-        elements.forEach(el => {
-            const text = el.textContent.trim();
-            if (/^\d+\.\d+$/.test(text)) {
-                results.elementsWithNumbers.push({
-                    text: text,
-                    tag: el.tagName,
-                    class: el.className,
-                    id: el.id,
-                    visible: el.offsetParent !== null
-                });
-            }
-        });
-
-        // إضافة توصيات
-        if (results.currentPrice === 0) {
-            results.recommendations.push('لم يتم العثور على أي سعر - تأكد من فتح صفحة التداول');
-        }
-
-        if (results.priceHistoryLength === 0) {
-            results.recommendations.push('لا يوجد تاريخ أسعار - انتظر قليلاً أو أعد تحميل الصفحة');
-        }
-
-        if (results.canvasCount === 0 && results.svgCount === 0) {
-            results.recommendations.push('لا توجد عناصر رسم بياني - تأكد من تحميل الرسم البياني');
-        }
-
-        if (results.numbersFound === 0) {
-            results.recommendations.push('لا توجد أرقام في الصفحة - تأكد من تحميل البيانات');
-        }
-
-        console.log('📊 نتائج التشخيص:', results);
-        return results;
-    }
-
-    getCurrentData() {
-        return {
-            currentPrice: this.currentPrice,
-            priceHistory: this.priceHistory,
+    sendToPopup() {
+        chrome.runtime.sendMessage({action: 'updatePopup', data: {
             indicators: this.indicators,
             recommendation: this.recommendation,
-            signals: this.signals,
-            timestamp: Date.now()
-        };
-    }
-
-    cleanup() {
-        console.log('🧹 تنظيف الموارد...');
-
-        // إيقاف مراقب DOM
-        if (this.domObserver) {
-            this.domObserver.disconnect();
-            this.domObserver = null;
-        }
-
-        // إيقاف التحديث الدوري
-        if (this.updateInterval) {
-            clearInterval(this.updateInterval);
-            this.updateInterval = null;
-        }
-
-        this.isActive = false;
-    }
-
-    destroy() {
-        this.cleanup();
-
-        if (this.analysisPanel) {
-            this.analysisPanel.remove();
-            this.analysisPanel = null;
-        }
-
-        console.log('🗑️ تم تدمير محلل PocketOption');
+            currentPrice: this.priceHistory.length? this.priceHistory[this.priceHistory.length-1].price: null,
+            priceHistory: this.priceHistory.slice(-60)
+        }});
     }
 }
 
-// تشغيل المحلل
-const analyzer = new PocketOptionAnalyzer();
 
-// إضافة مستمع لإيقاف المحلل عند مغادرة الصفحة
-window.addEventListener('beforeunload', () => {
-    analyzer.destroy();
+const assistant = new ScalpingAssistant();
+chrome.runtime.onMessage.addListener((req, sender, sendResponse) => {
+    if (req.action === 'getData') {
+        sendResponse({
+            indicators: assistant.indicators,
+            recommendation: assistant.recommendation,
+            currentPrice: assistant.priceHistory.length ? assistant.priceHistory[assistant.priceHistory.length-1].price : null,
+            priceHistory: assistant.priceHistory.slice(-60)
+        });
+    }
 });
